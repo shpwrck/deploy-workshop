@@ -1,12 +1,12 @@
 name: modules
-title: Home
+title: Advanced Deploymente Workshop
 version: master
 nav:
   - modules/ROOT/nav.adoc
 
 asciidoc:
   attributes:
-    lab_name: "Advanced Deployment Lab"
+    lab_name: "Advanced Deployment Workshop"
     release-version: master
     page-pagination: true
     page-links: []
