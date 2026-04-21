@@ -2,6 +2,10 @@
 
 This workshop provides a comprehensive exploration of how Kubernetes manages pod lifecycle, from initial scheduling through eviction, and how container images are distributed across your cluster. You will learn the mechanisms that control where pods run, when they are moved or terminated, and how to configure your cluster for optimal performance and reliability.
 
+ifdef::openshift-102-showroom[]
+include::openshift-102:ROOT:partial$cli-tools-container.adoc[]
+endif::[]
+
 == Overview
 
 The Advanced Deployment Lab covers four critical areas of Kubernetes operations:
