@@ -44,10 +44,10 @@ Benefits of using secondary schedulers include:
 
 === How Secondary Schedulers Work
 
-When a pod specifies a secondary scheduler name, the Kubernetes API server routes the pod to that scheduler instead of the default one. Each scheduler operates independently:
+When a pod specifies a secondary scheduler name, only that scheduler picks up the pod; the default scheduler ignores it. Each scheduler operates independently:
 
 1. **Pod Creation**: Pod is created with `schedulerName` specified
-2. **Scheduler Selection**: API server routes pod to the specified scheduler
+2. **Scheduler Selection**: The scheduler whose name matches `schedulerName` picks up the pod
 3. **Scheduling Process**: Secondary scheduler evaluates nodes using its own policies
 4. **Node Binding**: Scheduler binds pod to selected node
 5. **Pod Execution**: Kubelet on the selected node starts the pod
@@ -215,7 +215,7 @@ oc get pod <pod-name> -o jsonpath='{.spec.schedulerName}'
 oc describe pod <pod-name> | grep -i scheduler
 
 # Check secondary scheduler logs
-oc logs -n kube-system -l app=secondary-scheduler
+oc logs -n openshift-secondary-scheduler-operator -l app=secondary-scheduler
 ----
 
 === Scheduler Selection Behavior
@@ -223,7 +223,7 @@ oc logs -n kube-system -l app=secondary-scheduler
 If a pod specifies a scheduler name that doesn't exist or isn't running:
 
 * The pod remains in `Pending` state
-* Events will indicate the scheduler is not available
+* No scheduling events are recorded, because no scheduler picks up the pod
 * The default scheduler will not handle the pod automatically
 
 Always ensure the specified scheduler is deployed and running before creating pods that reference it.
@@ -267,7 +267,7 @@ Key parameters:
 * **globalDefault**: If true, this priority class is used for pods without a priorityClassName
 * **description**: Human-readable description of the priority class
 
-Priority values can range from -2147483648 to 1000000000 (inclusive). System-level priority classes typically use values below 2000000000.
+Priority values can range from -2147483648 to 1000000000 (inclusive). Values above 1000000000 are reserved for system-level priority classes such as `system-cluster-critical` (2000000000) and `system-node-critical` (2000001000).
 
 === Using Priority Classes
 
@@ -325,7 +325,7 @@ Preemption occurs when a higher-priority pod cannot be scheduled because nodes l
 Preemption behavior:
 
 * Only pods with lower priority can be preempted
-* Preemption respects Pod Disruption Budgets (PDBs)
+* Preemption respects Pod Disruption Budgets (PDBs) on a best-effort basis
 * Preempted pods are gracefully terminated
 * Preemption only occurs when necessary for scheduling higher-priority pods
 
@@ -353,7 +353,7 @@ spec:
       requests:
         cpu: "2"
         memory: "4Gi"
-
+---
 # High priority pod that needs the same resources
 apiVersion: v1
 kind: Pod
@@ -392,7 +392,7 @@ The scheduler evaluates which lower-priority pods can be preempted to accommodat
 When preemption occurs:
 
 1. **Evaluation**: Scheduler identifies lower-priority pods that can be preempted
-2. **PDB Check**: Verifies that preemption won't violate Pod Disruption Budgets
+2. **PDB Check**: Prefers victims whose eviction won't violate Pod Disruption Budgets (best effort, not guaranteed)
 3. **Graceful Termination**: Sends termination signal to preempted pods
 4. **Resource Release**: Waits for resources to be freed
 5. **Scheduling**: Schedules the higher-priority pod

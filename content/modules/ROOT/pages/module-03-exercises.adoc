@@ -108,7 +108,7 @@ Generate CPU load on the pods to trigger scaling. In a separate terminal, run:
 POD_NAME=$(oc get pods -l app=web -o jsonpath='{.items[0].metadata.name}')
 
 # Generate CPU load (this will run in the background)
-oc exec -it $POD_NAME -- sh -c "while true; do dd if=/dev/zero of=/dev/null; done" &
+oc exec $POD_NAME -- sh -c "while true; do dd if=/dev/zero of=/dev/null; done" &
 ----
 
 Monitor the HPA and deployment to observe scaling behavior:
@@ -213,7 +213,7 @@ oc get pods -l app=vpa-app
 
 === Step 2: Create a VPA in Recommendation Mode
 
-NOTE: Creating a VPA requires administrator privileges because VPA is a cluster-scoped resource, not namespace-scoped. Please ask your instructor to create the VPA for you.
+NOTE: Creating a VPA requires administrator privileges. Please ask your instructor to create the VPA for you.
 
 Create a VPA in "Off" mode to view recommendations without automatic updates:
 
@@ -265,9 +265,10 @@ oc describe vpa vpa-recommender
 ----
 
 The VPA will show recommendations including:
+
 * **Target**: Recommended values for optimal performance
 * **Lower Bound**: Minimum values to maintain performance
-* **Upper Bound**: Maximum values observed
+* **Upper Bound**: Maximum recommended values
 
 === Step 4: Generate Load and Monitor
 
@@ -279,7 +280,7 @@ Generate some load on the pods to provide usage data for VPA analysis:
 POD_NAME=$(oc get pods -l app=vpa-app -o jsonpath='{.items[0].metadata.name}')
 
 # Generate some CPU load
-oc exec -it $POD_NAME -- sh -c "for i in {1..100}; do dd if=/dev/zero of=/dev/null bs=1M count=10; done"
+oc exec -it $POD_NAME -- sh -c 'for i in $(seq 1 100); do dd if=/dev/zero of=/dev/null bs=1M count=10; done'
 ----
 
 Wait a few minutes, then check the VPA recommendations again:
@@ -398,6 +399,7 @@ oc get kubedescheduler cluster -n openshift-kube-descheduler-operator -o jsonpat
 ----
 
 Note which profiles are active. The available profiles include:
+
 * AffinityAndTaints
 * TopologyAndDuplicates
 * SoftTopologyAndDuplicates
@@ -437,7 +439,7 @@ oc get deployment -n openshift-kube-descheduler-operator
 oc get pods -n openshift-kube-descheduler-operator
 
 # View Descheduler Operator logs (if accessible)
-oc logs -n openshift-kube-descheduler-operator -l app=descheduler-operator --tail=50
+oc logs -n openshift-kube-descheduler-operator -l name=descheduler-operator --tail=50
 ----
 
 === Step 5: Understand Descheduler Behavior
@@ -520,6 +522,7 @@ spec:
 ----
 
 This configuration would:
+
 * Run descheduling every hour (3600 seconds)
 * Use the AffinityAndTaints and TopologyAndDuplicates profiles
 * Actually evict pods (Automatic mode)

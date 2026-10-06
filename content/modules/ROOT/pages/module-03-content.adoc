@@ -65,7 +65,7 @@ spec:
   deschedulingIntervalSeconds: 3600
   profiles:
   - LifecycleAndUtilization
-  - RemovePodsViolatingInterPodAntiAffinity
+  - AffinityAndTaints
   mode: Automatic
   evictionLimits:
     total: 10
@@ -86,13 +86,13 @@ Monitor descheduling operations to understand cluster optimization:
 [source,bash]
 ----
 # View Descheduler Operator status
-oc get descheduler
+oc get kubedescheduler -n openshift-kube-descheduler-operator
 
 # View detailed Descheduler configuration
-oc describe descheduler cluster-descheduler
+oc describe kubedescheduler cluster -n openshift-kube-descheduler-operator
 
 # View descheduler operator logs
-oc logs -n openshift-descheduler-operator -l app=descheduler-operator
+oc logs -n openshift-kube-descheduler-operator -l name=descheduler-operator
 
 # Check for descheduled pods
 oc get events --field-selector reason=Descheduled
@@ -342,7 +342,7 @@ VPA recommendations include:
 
 * **Target**: Recommended values for optimal performance
 * **Lower Bound**: Minimum values to maintain performance
-* **Upper Bound**: Maximum values observed
+* **Upper Bound**: Maximum recommended values
 * **Uncapped Target**: Recommendations without min/max constraints
 
 === VPA Resource Policies
@@ -362,7 +362,7 @@ resourcePolicy:
       cpu: 2
       memory: 4Gi
   - containerName: sidecar
-    mode: Off
+    mode: "Off"
 ----
 
 === VPA Limitations
@@ -456,7 +456,7 @@ oc get events --field-selector involvedObject.kind=HorizontalPodAutoscaler
 oc get vpa --all-namespaces
 
 # Monitor descheduler activity
-oc logs -n kube-system -l app=descheduler
+oc logs -n openshift-kube-descheduler-operator -l app=descheduler
 
 # Watch pod churn
 oc get pods -w

@@ -347,7 +347,7 @@ oc get pods -l app=spread -o wide | awk '{print $7}' | sort | uniq -c
 
 Update the deployment to use maxSkew: 2 and observe the difference:
 
-[source,yaml]
+[source,bash]
 ----
 # Edit the deployment
 oc edit deployment spread-deployment
@@ -614,7 +614,7 @@ oc get pod secondary-scheduled-pod
 oc describe pod secondary-scheduled-pod
 ----
 
-Note: If the secondary scheduler doesn't exist, the pod will remain in `Pending` state. Check the events to see the scheduling failure.
+Note: If the secondary scheduler doesn't exist, the pod will remain in `Pending` state. Check the events and notice that no scheduling events are recorded, because no scheduler picks up the pod.
 
 === Step 3: Use Default Scheduler
 
