@@ -1,5 +1,5 @@
 name: modules
-title: Advanced Deploymente Workshop
+title: Advanced Deployment Workshop
 version: master
 nav:
   - modules/ROOT/nav.adoc
