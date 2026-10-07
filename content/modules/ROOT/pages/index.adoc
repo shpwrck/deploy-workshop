@@ -21,7 +21,7 @@ This workshop assumes the following:
 
 * Basic understanding of Kubernetes concepts (pods, nodes, namespaces)
 * Familiarity with YAML configuration files
-* Access to a Kubernetes cluster (version 1.20 or later recommended)
+* Access to an OpenShift 4.16 or later cluster (Kubernetes 1.29 or later)
 * Command-line experience with `oc`
 * Understanding of container images and registries
 

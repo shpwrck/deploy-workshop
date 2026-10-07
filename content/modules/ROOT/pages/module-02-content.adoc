@@ -69,7 +69,7 @@ Taints allow nodes to repel pods that don't have matching tolerations. This is u
 [source,bash]
 ----
 # Add a taint to a node
-oc taint nodes node1 key=value:NoSchedule
+oc adm taint nodes node1 key=value:NoSchedule
 
 # Pods must have a matching toleration
 ----
@@ -334,6 +334,7 @@ Key parameters:
 * `topologyKey`: Node label key that defines topology domains
 * `whenUnsatisfiable`: Action when constraint cannot be satisfied (`DoNotSchedule` or `ScheduleAnyway`)
 * `labelSelector`: Selects which pods to count for skew calculation
+* `nodeTaintsPolicy`: Whether nodes with taints that the pod does not tolerate count as topology domains (`Ignore`, the default) or are left out of the skew calculation (`Honor`)
 
 ==== Node-Level Distribution
 
@@ -359,6 +360,7 @@ spec:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: DoNotSchedule
+        nodeTaintsPolicy: Honor
         labelSelector:
           matchLabels:
             app: web
@@ -368,6 +370,8 @@ spec:
 ----
 
 With 6 replicas and 3 nodes, this ensures each node gets 2 pods (maxSkew: 1 allows only a 2-2-2 distribution; 3-2-1 would have a skew of 2).
+
+`nodeTaintsPolicy: Honor` keeps nodes that the pods cannot run on, such as tainted control-plane nodes, out of the calculation. With the default (`Ignore`), those nodes count as domains with zero pods, so once each schedulable node has one pod, the remaining replicas stay `Pending`.
 
 ==== Zone-Level Distribution
 
@@ -433,6 +437,7 @@ spec:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: DoNotSchedule
+        nodeTaintsPolicy: Honor
         labelSelector:
           matchLabels:
             app: web
@@ -528,6 +533,7 @@ spec:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: DoNotSchedule
+        nodeTaintsPolicy: Honor
         labelSelector:
           matchLabels:
             app: web
@@ -590,7 +596,7 @@ oc describe pod <pod-name>
 oc describe nodes
 
 # Check scheduler logs
-oc logs -n kube-system -l component=kube-scheduler
+oc logs -n openshift-kube-scheduler -l app=openshift-kube-scheduler -c kube-scheduler
 ----
 
 == Best Practices
