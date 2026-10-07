@@ -1,6 +1,8 @@
 = Exercises
 :hardbreaks-option:
 
+NOTE: The exercises use `quay.io/nginx/nginx-unprivileged`, an NGINX image that runs as a non-root user and listens on port 8080. The `nginx` image from Docker Hub cannot start under OpenShift's default `restricted-v2` security context constraint.
+
 == Exercise 1: Node Selectors and Node Affinity
 
 In this exercise, you will practice using node selectors and node affinity to control pod placement.
@@ -33,7 +35,7 @@ spec:
     kubernetes.io/hostname: <node-name>
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 Apply the pod and verify it's scheduled on the correct node:
@@ -72,7 +74,7 @@ spec:
             operator: Exists
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 Apply and verify the pod placement:
@@ -106,17 +108,17 @@ The instructor will add a taint to prevent regular pods from being scheduled on 
 [source,bash]
 ----
 # Add a taint to a node (requires elevated privileges - instructor will run this)
-oc taint nodes <node-name> special-workload=true:NoSchedule
+oc adm taint nodes <node-name> special-workload=true:NoSchedule
 
 # Verify the taint
 oc describe node <node-name> | grep Taint
 ----
 
-After the instructor has added the taint, verify it exists using the second command above.
+After the instructor has added the taint, verify it exists using the second command above. The pods in the next steps use the name of the tainted node.
 
 === Step 2: Attempt to Schedule a Regular Pod
 
-Try to create a pod without a toleration:
+Try to create a pod without a toleration. Replace `<node-name>` with the name of the tainted node, so that the pod can only be placed on that node:
 
 [source,yaml]
 ----
@@ -125,9 +127,11 @@ kind: Pod
 metadata:
   name: regular-pod
 spec:
+  nodeSelector:
+    kubernetes.io/hostname: <node-name>
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -137,11 +141,11 @@ oc get pod regular-pod
 oc describe pod regular-pod
 ----
 
-Observe that the pod remains in `Pending` state due to the taint.
+Observe that the pod remains in `Pending` state: the only node its `nodeSelector` allows has a taint that the pod does not tolerate. The `FailedScheduling` event reports `1 node(s) had untolerated taint(s)`.
 
 === Step 3: Create a Pod with Toleration
 
-Create a pod that can tolerate the taint:
+Create a pod that tolerates the taint, pinned to the same node:
 
 [source,yaml]
 ----
@@ -150,6 +154,8 @@ kind: Pod
 metadata:
   name: tolerated-pod
 spec:
+  nodeSelector:
+    kubernetes.io/hostname: <node-name>
   tolerations:
   - key: "special-workload"
     operator: "Equal"
@@ -157,7 +163,7 @@ spec:
     effect: "NoSchedule"
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -166,7 +172,7 @@ oc apply -f tolerated-pod.yaml
 oc get pod tolerated-pod -o wide
 ----
 
-Verify that this pod is scheduled on the tainted node.
+Verify that this pod is scheduled on the tainted node. The toleration only allows the pod to run on the tainted node; it does not attract the pod to it. Without the `nodeSelector`, the scheduler could place this pod on any node.
 
 === Step 4: Remove the Taint
 
@@ -177,7 +183,7 @@ The instructor will remove the taint:
 [source,bash]
 ----
 # Remove the taint (requires elevated privileges - instructor will run this)
-oc taint nodes <node-name> special-workload=true:NoSchedule-
+oc adm taint nodes <node-name> special-workload=true:NoSchedule-
 
 # Clean up your test pods
 oc delete pod regular-pod tolerated-pod
@@ -221,7 +227,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: nginx
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -307,13 +313,16 @@ spec:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: DoNotSchedule
+        nodeTaintsPolicy: Honor
         labelSelector:
           matchLabels:
             app: spread
       containers:
       - name: nginx
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
 ----
+
+`nodeTaintsPolicy: Honor` leaves nodes whose taints the pod does not tolerate, such as tainted control-plane nodes, out of the skew calculation. Without it, those nodes count as domains with zero pods, and most replicas stay `Pending`.
 
 [source,bash]
 ----
@@ -347,7 +356,7 @@ oc get pods -l app=spread -o wide | awk '{print $7}' | sort | uniq -c
 
 Update the deployment to use maxSkew: 2 and observe the difference:
 
-[source,yaml]
+[source,bash]
 ----
 # Edit the deployment
 oc edit deployment spread-deployment
@@ -399,7 +408,7 @@ spec:
     feature.node.kubernetes.io/cpu-cpuid.AVX: "true"
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -432,7 +441,7 @@ spec:
             - "true"
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -462,7 +471,7 @@ Examine available resources on your nodes:
 oc describe nodes | grep -A 5 "Allocated resources"
 
 # Get resource usage summary
-oc top nodes
+oc adm top nodes
 ----
 
 === Step 2: Create Pods with Resource Requests
@@ -478,7 +487,7 @@ metadata:
 spec:
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
     resources:
       requests:
         memory: "256Mi"
@@ -517,7 +526,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             memory: "128Mi"
@@ -531,7 +540,7 @@ spec:
 ----
 oc apply -f resource-deployment.yaml
 oc get pods -l app=resource-app -o wide
-oc top nodes
+oc adm top nodes
 ----
 
 Observe how the scheduler distributes pods based on available resources.
@@ -549,7 +558,7 @@ metadata:
 spec:
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
     resources:
       requests:
         memory: "1000Gi"
@@ -579,15 +588,19 @@ Practice using a secondary scheduler for pod scheduling.
 
 === Step 1: Verify Available Schedulers
 
-Check what schedulers are available in your cluster:
+Check what schedulers are available in your cluster. On OpenShift, the default scheduler runs in the `openshift-kube-scheduler` namespace, and the Secondary Scheduler Operator runs secondary schedulers in `openshift-secondary-scheduler-operator`:
+
+NOTE: Listing pods and config maps in these namespaces requires elevated privileges. If you get a `Forbidden` error, ask your instructor to show you the output.
 
 [source,bash]
 ----
 # List scheduler pods
-oc get pods -n kube-system | grep scheduler
+oc get pods -n openshift-kube-scheduler -l app=openshift-kube-scheduler
+oc get pods -n openshift-secondary-scheduler-operator -l app=secondary-scheduler
 
 # Check scheduler configurations
-oc get configmap -n kube-system | grep scheduler
+oc get configmap config -n openshift-kube-scheduler -o yaml
+oc get configmap -n openshift-secondary-scheduler-operator
 ----
 
 === Step 2: Create a Pod with Secondary Scheduler
@@ -604,7 +617,7 @@ spec:
   schedulerName: my-custom-scheduler
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -614,7 +627,7 @@ oc get pod secondary-scheduled-pod
 oc describe pod secondary-scheduled-pod
 ----
 
-Note: If the secondary scheduler doesn't exist, the pod will remain in `Pending` state. Check the events to see the scheduling failure.
+Note: If the secondary scheduler doesn't exist, the pod will remain in `Pending` state. Check the events and notice that no scheduling events are recorded, because no scheduler picks up the pod.
 
 === Step 3: Use Default Scheduler
 
@@ -629,7 +642,7 @@ metadata:
 spec:
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]

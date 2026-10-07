@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
       - name: web
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             cpu: 100m
@@ -90,9 +90,17 @@ oc get hpa web-hpa
 
 # Get detailed HPA information
 oc describe hpa web-hpa
+----
 
-# Watch HPA and deployment replicas
+Watch the HPA and the deployment replicas, one at a time (press Ctrl+C to stop each watch):
+
+[source,bash]
+----
 oc get hpa web-hpa -w
+----
+
+[source,bash]
+----
 oc get deployment web-deployment -w
 ----
 
@@ -108,7 +116,7 @@ Generate CPU load on the pods to trigger scaling. In a separate terminal, run:
 POD_NAME=$(oc get pods -l app=web -o jsonpath='{.items[0].metadata.name}')
 
 # Generate CPU load (this will run in the background)
-oc exec -it $POD_NAME -- sh -c "while true; do dd if=/dev/zero of=/dev/null; done" &
+oc exec $POD_NAME -- sh -c "while true; do dd if=/dev/zero of=/dev/null; done" &
 ----
 
 Monitor the HPA and deployment to observe scaling behavior:
@@ -142,15 +150,26 @@ Note how the replica count changes based on CPU utilization.
 
 === Step 6: Stop Load and Observe Scale-Down
 
-Stop the load generation and observe the scale-down behavior:
+Stop the load generation and observe the scale-down behavior. In the terminal where you started the load, run:
 
 [source,bash]
 ----
-# Stop the load generation process
-oc exec -it $POD_NAME -- pkill dd
+# Stop the local oc exec job; the loop keeps running inside the container
+kill %1
 
-# Monitor scale-down
+# Delete the loaded pod; the Deployment replaces it with an idle pod
+oc delete pod $POD_NAME
+----
+
+Monitor the scale-down, one watch at a time (press Ctrl+C to stop each watch):
+
+[source,bash]
+----
 oc get hpa web-hpa -w
+----
+
+[source,bash]
+----
 oc get deployment web-deployment -w
 ----
 
@@ -192,7 +211,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             cpu: 100m
@@ -213,7 +232,7 @@ oc get pods -l app=vpa-app
 
 === Step 2: Create a VPA in Recommendation Mode
 
-NOTE: Creating a VPA requires administrator privileges because VPA is a cluster-scoped resource, not namespace-scoped. Please ask your instructor to create the VPA for you.
+NOTE: Creating a VPA requires administrator privileges. Please ask your instructor to create the VPA for you.
 
 Create a VPA in "Off" mode to view recommendations without automatic updates:
 
@@ -223,7 +242,8 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: vpa-recommender
-  do-not-deploy: "true"
+  annotations:
+    do-not-deploy: "true"
 spec:
   targetRef:
     apiVersion: apps/v1
@@ -265,9 +285,10 @@ oc describe vpa vpa-recommender
 ----
 
 The VPA will show recommendations including:
+
 * **Target**: Recommended values for optimal performance
 * **Lower Bound**: Minimum values to maintain performance
-* **Upper Bound**: Maximum values observed
+* **Upper Bound**: Maximum recommended values
 
 === Step 4: Generate Load and Monitor
 
@@ -279,7 +300,7 @@ Generate some load on the pods to provide usage data for VPA analysis:
 POD_NAME=$(oc get pods -l app=vpa-app -o jsonpath='{.items[0].metadata.name}')
 
 # Generate some CPU load
-oc exec -it $POD_NAME -- sh -c "for i in {1..100}; do dd if=/dev/zero of=/dev/null bs=1M count=10; done"
+oc exec -it $POD_NAME -- sh -c 'for i in $(seq 1 100); do dd if=/dev/zero of=/dev/null bs=1M count=10; done'
 ----
 
 Wait a few minutes, then check the VPA recommendations again:
@@ -303,7 +324,8 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: vpa-initial
-  do-not-deploy: "true"
+  annotations:
+    do-not-deploy: "true"
 spec:
   targetRef:
     apiVersion: apps/v1
@@ -398,6 +420,7 @@ oc get kubedescheduler cluster -n openshift-kube-descheduler-operator -o jsonpat
 ----
 
 Note which profiles are active. The available profiles include:
+
 * AffinityAndTaints
 * TopologyAndDuplicates
 * SoftTopologyAndDuplicates
@@ -437,7 +460,7 @@ oc get deployment -n openshift-kube-descheduler-operator
 oc get pods -n openshift-kube-descheduler-operator
 
 # View Descheduler Operator logs (if accessible)
-oc logs -n openshift-kube-descheduler-operator -l app=descheduler-operator --tail=50
+oc logs -n openshift-kube-descheduler-operator -l name=descheduler-operator --tail=50
 ----
 
 === Step 5: Understand Descheduler Behavior
@@ -462,7 +485,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             cpu: 100m
@@ -483,8 +506,8 @@ Look for descheduling-related events:
 
 [source,bash]
 ----
-# View events related to descheduling
-oc get events --all-namespaces --field-selector reason=Descheduled
+# View events recorded by the descheduler in your project
+oc get events --field-selector reportingComponent=sigs.k8s.io.descheduler
 
 # View recent events for your test deployment
 oc get events --field-selector involvedObject.name=descheduler-test
@@ -493,7 +516,7 @@ oc get events --field-selector involvedObject.name=descheduler-test
 oc get pods -l app=descheduler-test -o wide -w
 ----
 
-Note: If the Descheduler is in Predictive mode, it will simulate evictions but not actually move pods. Only Automatic mode performs actual evictions.
+Note: If the Descheduler is in Predictive mode, it will simulate evictions but not actually move pods. Only Automatic mode performs actual evictions and records an event for each one; the event reason is the name of the strategy that evicted the pod (for example, `RemovePodsViolatingInterPodAntiAffinity`). The descheduler needs at least two ready nodes: on a single-node cluster it skips every cycle and evicts nothing.
 
 === Step 7: Example Descheduler Configuration
 
@@ -506,7 +529,8 @@ kind: KubeDescheduler
 metadata:
   name: cluster
   namespace: openshift-kube-descheduler-operator
-  do-not-deploy: "true"
+  annotations:
+    do-not-deploy: "true"
 spec:
   managementState: Managed
   deschedulingIntervalSeconds: 3600
@@ -520,6 +544,7 @@ spec:
 ----
 
 This configuration would:
+
 * Run descheduling every hour (3600 seconds)
 * Use the AffinityAndTaints and TopologyAndDuplicates profiles
 * Actually evict pods (Automatic mode)

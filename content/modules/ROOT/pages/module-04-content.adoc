@@ -67,6 +67,7 @@ spec:
 ----
 
 Available policies:
+
 * **Always**: Always pull the image, even if it exists locally
 * **IfNotPresent**: Only pull if the image doesn't exist locally (default for tags other than `latest`)
 * **Never**: Never pull the image; it must exist locally
@@ -120,6 +121,7 @@ oc debug node/<node-name> -- chroot /host df -h /var/lib/containers
 ----
 
 Image caching provides:
+
 * Faster pod startup times
 * Reduced network bandwidth usage
 * Lower registry load
@@ -134,11 +136,12 @@ OpenShift automatically manages image storage through garbage collection:
 # View kubelet configuration for image GC
 oc get kubeletconfig -o yaml
 
-# Check node disk usage
-oc adm top nodes
+# Check node disk usage for images (oc adm top nodes shows only CPU and memory)
+oc debug node/<node-name> -- chroot /host df -h /var/lib/containers
 ----
 
 Garbage collection settings control:
+
 * When images are removed from nodes
 * Disk usage thresholds that trigger cleanup
 * Minimum age before images can be garbage collected
@@ -172,7 +175,7 @@ spec:
         command: ["echo", "Image pre-pulled"]
       containers:
       - name: pause
-        image: k8s.gcr.io/pause:3.1
+        image: registry.k8s.io/pause:3.1
 ----
 
 == Image Puller
@@ -194,21 +197,20 @@ Configure the Image Puller through a custom resource:
 
 [source,yaml]
 ----
-apiVersion: apps.openshift.io/v1
+apiVersion: che.eclipse.org/v1alpha1
 kind: KubernetesImagePuller
 metadata:
   name: cluster-image-puller
   namespace: openshift-image-puller
 spec:
-  images: "registry.example.com/myapp:v1.2.3,registry.example.com/nginx:latest"
-  nodeSelector:
-    node-role.kubernetes.io/worker: ""
+  images: "myapp=registry.example.com/myapp:v1.2.3;nginx=registry.example.com/nginx:latest"
+  nodeSelector: '{"node-role.kubernetes.io/worker": ""}'
 ----
 
 Configuration options:
 
-* **images**: Comma-separated string of images to pre-pull
-* **nodeSelector**: Which nodes should pull images
+* **images**: Semicolon-separated string of `name=image` pairs to pre-pull
+* **nodeSelector**: Which nodes should pull images (a JSON-encoded string)
 
 === Viewing Image Puller Status
 
@@ -226,7 +228,7 @@ oc get daemonset -n openshift-image-puller
 oc get pods -n openshift-image-puller
 
 # View Image Puller logs
-oc logs -n openshift-image-puller -l app=image-puller --tail=50
+oc logs -n openshift-image-puller -l app=kubernetes-image-puller --tail=50
 ----
 
 === Image Puller Benefits
@@ -265,21 +267,18 @@ Use registry mirrors to reduce latency:
 
 [source,yaml]
 ----
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
 metadata:
   name: registry-mirror
 spec:
-  config:
-    ignition:
-      version: 3.2.0
-    storage:
-      files:
-      - path: /etc/containers/registries.conf.d/mirror.conf
-        mode: 0644
-        contents:
-          source: data:text/plain;base64,...
+  imageTagMirrors:
+  - source: registry.example.com
+    mirrors:
+    - mirror.example.com
 ----
+
+An `ImageTagMirrorSet` applies to images pulled by tag. For images pulled by digest, use an `ImageDigestMirrorSet` with `imageDigestMirrors` in the same format. Both are cluster-wide resources that OpenShift applies to every node, so you do not need a `MachineConfig` to configure mirrors.
 
 === Lean Base Images
 
@@ -330,6 +329,7 @@ oc image info registry.example.com/ubi9/ubi:latest | grep -i size
 ----
 
 A lean base image (50-100MB) compared to a full OS image (500MB-1GB) can:
+
 * Reduce pull time by 80-90%
 * Decrease storage requirements by 80-90%
 * Improve cache hit rates
@@ -356,6 +356,7 @@ CMD ["/app/app"]
 ----
 
 This approach:
+
 * Keeps build tools out of production images
 * Uses lean base images for runtime
 * Minimizes final image size
@@ -384,7 +385,7 @@ oc get events --field-selector reason=Failed
 oc describe pod <pod-name> | grep -i image
 
 # Monitor node image cache usage
-oc adm top nodes
+oc debug node/<node-name> -- chroot /host df -h /var/lib/containers
 ----
 
 Key metrics to monitor:
