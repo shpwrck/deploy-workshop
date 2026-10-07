@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
       - name: web
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             cpu: 100m
@@ -192,7 +192,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             cpu: 100m
@@ -464,7 +464,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             cpu: 100m

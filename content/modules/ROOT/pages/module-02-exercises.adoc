@@ -1,6 +1,8 @@
 = Exercises
 :hardbreaks-option:
 
+NOTE: The exercises use `quay.io/nginx/nginx-unprivileged`, an NGINX image that runs as a non-root user and listens on port 8080. The `nginx` image from Docker Hub cannot start under OpenShift's default `restricted-v2` security context constraint.
+
 == Exercise 1: Node Selectors and Node Affinity
 
 In this exercise, you will practice using node selectors and node affinity to control pod placement.
@@ -33,7 +35,7 @@ spec:
     kubernetes.io/hostname: <node-name>
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 Apply the pod and verify it's scheduled on the correct node:
@@ -72,7 +74,7 @@ spec:
             operator: Exists
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 Apply and verify the pod placement:
@@ -127,7 +129,7 @@ metadata:
 spec:
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -157,7 +159,7 @@ spec:
     effect: "NoSchedule"
   containers:
   - name: nginx
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -221,7 +223,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: nginx
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -312,7 +314,7 @@ spec:
             app: spread
       containers:
       - name: nginx
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -399,7 +401,7 @@ spec:
     feature.node.kubernetes.io/cpu-cpuid.AVX: "true"
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -432,7 +434,7 @@ spec:
             - "true"
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -478,7 +480,7 @@ metadata:
 spec:
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
     resources:
       requests:
         memory: "256Mi"
@@ -517,7 +519,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: nginx:latest
+        image: quay.io/nginx/nginx-unprivileged:latest
         resources:
           requests:
             memory: "128Mi"
@@ -549,7 +551,7 @@ metadata:
 spec:
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
     resources:
       requests:
         memory: "1000Gi"
@@ -604,7 +606,7 @@ spec:
   schedulerName: my-custom-scheduler
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
@@ -629,7 +631,7 @@ metadata:
 spec:
   containers:
   - name: app
-    image: nginx:latest
+    image: quay.io/nginx/nginx-unprivileged:latest
 ----
 
 [source,bash]
