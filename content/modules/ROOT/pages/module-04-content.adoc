@@ -136,8 +136,8 @@ OpenShift automatically manages image storage through garbage collection:
 # View kubelet configuration for image GC
 oc get kubeletconfig -o yaml
 
-# Check node disk usage
-oc adm top nodes
+# Check node disk usage for images (oc adm top nodes shows only CPU and memory)
+oc debug node/<node-name> -- chroot /host df -h /var/lib/containers
 ----
 
 Garbage collection settings control:
@@ -267,21 +267,18 @@ Use registry mirrors to reduce latency:
 
 [source,yaml]
 ----
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
 metadata:
   name: registry-mirror
 spec:
-  config:
-    ignition:
-      version: 3.2.0
-    storage:
-      files:
-      - path: /etc/containers/registries.conf.d/mirror.conf
-        mode: 0644
-        contents:
-          source: data:text/plain;base64,...
+  imageTagMirrors:
+  - source: registry.example.com
+    mirrors:
+    - mirror.example.com
 ----
+
+An `ImageTagMirrorSet` applies to images pulled by tag. For images pulled by digest, use an `ImageDigestMirrorSet` with `imageDigestMirrors` in the same format. Both are cluster-wide resources that OpenShift applies to every node, so you do not need a `MachineConfig` to configure mirrors.
 
 === Lean Base Images
 
@@ -388,7 +385,7 @@ oc get events --field-selector reason=Failed
 oc describe pod <pod-name> | grep -i image
 
 # Monitor node image cache usage
-oc adm top nodes
+oc debug node/<node-name> -- chroot /host df -h /var/lib/containers
 ----
 
 Key metrics to monitor:

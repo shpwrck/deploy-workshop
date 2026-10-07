@@ -90,9 +90,17 @@ oc get hpa web-hpa
 
 # Get detailed HPA information
 oc describe hpa web-hpa
+----
 
-# Watch HPA and deployment replicas
+Watch the HPA and the deployment replicas, one at a time (press Ctrl+C to stop each watch):
+
+[source,bash]
+----
 oc get hpa web-hpa -w
+----
+
+[source,bash]
+----
 oc get deployment web-deployment -w
 ----
 
@@ -142,15 +150,26 @@ Note how the replica count changes based on CPU utilization.
 
 === Step 6: Stop Load and Observe Scale-Down
 
-Stop the load generation and observe the scale-down behavior:
+Stop the load generation and observe the scale-down behavior. In the terminal where you started the load, run:
 
 [source,bash]
 ----
-# Stop the load generation process
-oc exec -it $POD_NAME -- pkill dd
+# Stop the local oc exec job; the loop keeps running inside the container
+kill %1
 
-# Monitor scale-down
+# Delete the loaded pod; the Deployment replaces it with an idle pod
+oc delete pod $POD_NAME
+----
+
+Monitor the scale-down, one watch at a time (press Ctrl+C to stop each watch):
+
+[source,bash]
+----
 oc get hpa web-hpa -w
+----
+
+[source,bash]
+----
 oc get deployment web-deployment -w
 ----
 
@@ -223,7 +242,8 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: vpa-recommender
-  do-not-deploy: "true"
+  annotations:
+    do-not-deploy: "true"
 spec:
   targetRef:
     apiVersion: apps/v1
@@ -304,7 +324,8 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: vpa-initial
-  do-not-deploy: "true"
+  annotations:
+    do-not-deploy: "true"
 spec:
   targetRef:
     apiVersion: apps/v1
@@ -485,8 +506,8 @@ Look for descheduling-related events:
 
 [source,bash]
 ----
-# View events related to descheduling
-oc get events --all-namespaces --field-selector reason=Descheduled
+# View events recorded by the descheduler in your project
+oc get events --field-selector reportingComponent=sigs.k8s.io.descheduler
 
 # View recent events for your test deployment
 oc get events --field-selector involvedObject.name=descheduler-test
@@ -495,7 +516,7 @@ oc get events --field-selector involvedObject.name=descheduler-test
 oc get pods -l app=descheduler-test -o wide -w
 ----
 
-Note: If the Descheduler is in Predictive mode, it will simulate evictions but not actually move pods. Only Automatic mode performs actual evictions.
+Note: If the Descheduler is in Predictive mode, it will simulate evictions but not actually move pods. Only Automatic mode performs actual evictions and records an event for each one; the event reason is the name of the strategy that evicted the pod (for example, `RemovePodsViolatingInterPodAntiAffinity`). The descheduler needs at least two ready nodes: on a single-node cluster it skips every cycle and evicts nothing.
 
 === Step 7: Example Descheduler Configuration
 
@@ -508,7 +529,8 @@ kind: KubeDescheduler
 metadata:
   name: cluster
   namespace: openshift-kube-descheduler-operator
-  do-not-deploy: "true"
+  annotations:
+    do-not-deploy: "true"
 spec:
   managementState: Managed
   deschedulingIntervalSeconds: 3600

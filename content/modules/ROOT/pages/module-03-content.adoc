@@ -49,7 +49,7 @@ The Descheduler Operator is configured through a Descheduler custom resource. Th
 
 * **Descheduling interval**: How often to evaluate pods for descheduling
 * **Strategy parameters**: Thresholds and rules for each enabled strategy
-* **Namespaces to include/exclude**: Scope of descheduling operations
+* **Namespaces to include/exclude**: Scope of descheduling operations (`profileCustomizations.namespaces`). The `LowNodeUtilization` strategy in the `LifecycleAndUtilization` profile does not support an include list: when you set one, that strategy still considers every namespace except the protected `openshift-*`, `kube-system` and `hypershift` namespaces
 
 Example Descheduler configuration using profiles:
 
@@ -95,11 +95,13 @@ oc describe kubedescheduler cluster -n openshift-kube-descheduler-operator
 oc logs -n openshift-kube-descheduler-operator -l name=descheduler-operator
 
 # Check for descheduled pods
-oc get events --field-selector reason=Descheduled
+oc get events --field-selector reportingComponent=sigs.k8s.io.descheduler
 
 # Monitor pod movements
 oc get pods -o wide --watch
 ----
+
+NOTE: The descheduler records an event on each pod it evicts. The event reason is the name of the strategy that evicted the pod (for example, `RemovePodsViolatingInterPodAntiAffinity`), not `Descheduled`. Events are recorded only in `Automatic` mode; in `Predictive` mode the descheduler only logs the evictions it would perform. The descheduler also needs at least two ready nodes: on a single-node cluster it skips every descheduling cycle and evicts nothing.
 
 == Horizontal Pod Autoscaler (HPA)
 
@@ -286,7 +288,7 @@ VPA operates in different modes:
 
 * **Off**: VPA only provides recommendations, doesn't make changes
 * **Initial**: VPA sets resource requests on pod creation only
-* **Auto**: VPA updates resource requests on existing pods (requires pod recreation)
+* **Auto**: Deprecated; currently equivalent to `Recreate`, and the API returns a deprecation warning when you use it
 * **Recreate**: VPA recreates pods to apply new resource settings
 
 === Creating a VPA
@@ -305,7 +307,7 @@ spec:
     kind: Deployment
     name: web-deployment
   updatePolicy:
-    updateMode: "Auto"
+    updateMode: "Recreate"
   resourcePolicy:
     containerPolicies:
     - containerName: app
@@ -320,7 +322,7 @@ spec:
 
 Key parameters:
 
-* `updateMode`: How VPA applies recommendations (Off, Initial, Auto, Recreate)
+* `updateMode`: How VPA applies recommendations (Off, Initial, Recreate; Auto is deprecated)
 * `minAllowed`: Minimum resource values to set
 * `maxAllowed`: Maximum resource values to set
 * `controlledResources`: Which resources VPA should manage
